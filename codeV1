@@ -1,0 +1,101 @@
+local starterGui = game:GetService("StarterGui")
+wait(1)
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "HEY HEY!",
+    Text = "PLEASE DO NOT MODIFY THIS SCRIPT PLEASE GO TO discord.gg/AIROW,cowy.com IF YOU HAVE WANT YOUR IDEAS TO BE ON THERE",
+    Duration = 17
+})
+
+-- Create GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ESPGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 120, 0, 40)
+ToggleButton.Position = UDim2.new(0, 10, 1, -50) -- Bottom left
+ToggleButton.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+ToggleButton.TextColor3 = Color3.new(1, 1, 1)
+ToggleButton.Text = "Toggle ESP"
+ToggleButton.Parent = ScreenGui
+
+local espEnabled = false
+
+-- Color map
+local colorMap = {
+	["Head"] = Color3.fromRGB(255, 0, 0),
+	["Torso"] = Color3.fromRGB(0, 0, 255),
+	["UpperTorso"] = Color3.fromRGB(0, 0, 255),
+	["LowerTorso"] = Color3.fromRGB(0, 0, 255),
+	["Left Leg"] = Color3.fromRGB(0, 255, 0),
+	["Right Leg"] = Color3.fromRGB(0, 255, 0),
+	["LeftLowerLeg"] = Color3.fromRGB(0, 255, 0),
+	["RightLowerLeg"] = Color3.fromRGB(0, 255, 0),
+	["LeftUpperLeg"] = Color3.fromRGB(0, 255, 0),
+	["RightUpperLeg"] = Color3.fromRGB(0, 255, 0),
+	["Left Arm"] = Color3.fromRGB(128, 0, 128),
+	["Right Arm"] = Color3.fromRGB(128, 0, 128),
+	["LeftLowerArm"] = Color3.fromRGB(128, 0, 128),
+	["RightLowerArm"] = Color3.fromRGB(128, 0, 128),
+	["LeftUpperArm"] = Color3.fromRGB(128, 0, 128),
+	["RightUpperArm"] = Color3.fromRGB(128, 0, 128)
+}
+
+-- Add ESP to a single part
+local function addESPPart(part, color)
+	local adorn = Instance.new("BoxHandleAdornment")
+	adorn.Name = "ESPAdornment"
+	adorn.Adornee = part
+	adorn.Size = part.Size
+	adorn.Color3 = color
+	adorn.AlwaysOnTop = true
+	adorn.ZIndex = 5
+	adorn.Transparency = 0.3
+	adorn.Parent = part
+end
+
+-- Add ESP to a character
+local function addESPToCharacter(char)
+	for _, part in pairs(char:GetDescendants()) do
+		if part:IsA("BasePart") and colorMap[part.Name] then
+			if not part:FindFirstChild("ESPAdornment") then
+				addESPPart(part, colorMap[part.Name])
+			end
+		end
+	end
+end
+
+-- Remove ESP from a character
+local function removeESPFromCharacter(char)
+	for _, part in pairs(char:GetDescendants()) do
+		if part:IsA("BasePart") then
+			local adorn = part:FindFirstChild("ESPAdornment")
+			if adorn then
+				adorn:Destroy()
+			end
+		end
+	end
+end
+
+-- Toggle button logic
+ToggleButton.MouseButton1Click:Connect(function()
+	espEnabled = not espEnabled
+	ToggleButton.Text = espEnabled and "ESP ON" or "ESP OFF"
+end)
+
+-- Repeating loop to apply/remove ESP every second
+task.spawn(function()
+	while true do
+        task.wait(0.1)
+		for _, player in pairs(game.Players:GetPlayers()) do
+			if player ~= game.Players.LocalPlayer and player.Character then
+				if espEnabled then
+					addESPToCharacter(player.Character)
+				else
+					removeESPFromCharacter(player.Character)
+				end
+			end
+		end
+	end
+end)
