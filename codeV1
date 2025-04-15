@@ -1,165 +1,263 @@
-game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "HEY HEY!",
-    Text = "PLEASE DO NOT MODIFY THIS SCRIPT PLEASE GO TO discord.gg/AIROW,cowy.com IF YOU HAVE WANT YOUR IDEAS TO BE ON THERE",
-    Duration = 20
-})
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- GUI Setup
-local player = game.Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ESPGui"
+screenGui.Name = "UltimateUtilityGUI"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.DisplayOrder = 999999
-screenGui.Parent = playerGui
+screenGui.Parent = PlayerGui
 
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0, 120, 0, 40)
-toggleButton.Position = UDim2.new(0, 10, 1, -50)
-toggleButton.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-toggleButton.TextColor3 = Color3.new(1, 1, 1)
-toggleButton.Text = "Toggle ESP"
-toggleButton.ZIndex = 10000
-toggleButton.Parent = screenGui
+-- Container Frame
+local container = Instance.new("Frame")
+container.Size = UDim2.new(0, 200, 0, 600)
+container.Position = UDim2.new(0, 10, 1, -610) -- Start at bottom with 10px margin
+container.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+container.BorderSizePixel = 1
+container.ZIndex = 1000
+container.ClipsDescendants = true
+container.Parent = screenGui
 
+local layout = Instance.new("UIListLayout", container)
+layout.Padding = UDim.new(0, 5)
+
+-- Minimize Button (Added as first element)
+local minimizeButton = Instance.new("TextButton")
+minimizeButton.Size = UDim2.new(1, -10, 0, 30)
+minimizeButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+minimizeButton.TextColor3 = Color3.new(1, 1, 1)
+minimizeButton.Font = Enum.Font.SourceSansBold
+minimizeButton.TextSize = 16
+minimizeButton.Text = "▼"
+minimizeButton.ZIndex = 1001
+minimizeButton.Parent = container
+
+-- Minimize System
+local minimized = false
+local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad)
+
+local function toggleGUI()
+    minimized = not minimized
+    local targetSize = minimized and UDim2.new(0, 200, 0, 30) or UDim2.new(0, 200, 0, 600)
+    local targetPosition = minimized and UDim2.new(0, 10, 1, -40) or UDim2.new(0, 10, 1, -610)
+    minimizeButton.Text = minimized and "▲" or "▼"
+    
+    TweenService:Create(container, tweenInfo, {
+        Size = targetSize,
+        Position = targetPosition
+    }):Play()
+end
+
+minimizeButton.MouseButton1Click:Connect(toggleGUI)
+
+-- Helper: Create Button (existing functionality)
+local function createButton(text, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 16
+    btn.Text = text
+    btn.ZIndex = 1001
+    btn.Parent = container
+    if callback then
+        btn.MouseButton1Click:Connect(callback)
+    end
+    return btn
+end
+
+-- Rest of your existing features below (ESP, Speed, Jump, etc.) --
+-- ESP
 local espEnabled = false
+local espObjects = {}
 
-local colorMap = {
-	["Head"] = Color3.fromRGB(255, 0, 0),
-	["Torso"] = Color3.fromRGB(0, 0, 255),
-	["UpperTorso"] = Color3.fromRGB(0, 0, 255),
-	["LowerTorso"] = Color3.fromRGB(0, 0, 255),
-	["Left Leg"] = Color3.fromRGB(0, 255, 0),
-	["Right Leg"] = Color3.fromRGB(0, 255, 0),
-	["LeftLowerLeg"] = Color3.fromRGB(0, 255, 0),
-	["RightLowerLeg"] = Color3.fromRGB(0, 255, 0),
-	["LeftUpperLeg"] = Color3.fromRGB(0, 255, 0),
-	["RightUpperLeg"] = Color3.fromRGB(0, 255, 0),
-	["Left Arm"] = Color3.fromRGB(128, 0, 128),
-	["Right Arm"] = Color3.fromRGB(128, 0, 128),
-	["LeftLowerArm"] = Color3.fromRGB(128, 0, 128),
-	["RightLowerArm"] = Color3.fromRGB(128, 0, 128),
-	["LeftUpperArm"] = Color3.fromRGB(128, 0, 128),
-	["RightUpperArm"] = Color3.fromRGB(128, 0, 128)
-}
-
--- Create ESP part adornment
-local function addESPPart(part, color)
-	if not part:FindFirstChild("ESPAdornment") then
-		local adorn = Instance.new("BoxHandleAdornment")
-		adorn.Name = "ESPAdornment"
-		adorn.Adornee = part
-		adorn.Size = part.Size
-		adorn.Color3 = color
-		adorn.AlwaysOnTop = true
-		adorn.ZIndex = 5
-		adorn.Transparency = 0.3
-		adorn.Parent = part
-	end
+local function clearESP()
+    for _, v in pairs(espObjects) do
+        if v and v.Parent then
+            v:Destroy()
+        end
+    end
+    espObjects = {}
 end
 
--- Name + Health tag with proper scaling
-local function addNameHealthTag(character, playerObj)
-	if character:FindFirstChild("Head") and not character:FindFirstChild("ESPBillboard") then
-		local billboard = Instance.new("BillboardGui")
-		billboard.Name = "ESPBillboard"
-		billboard.Size = UDim2.new(4, 0, 1, 0) -- scalable size
-		billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-		billboard.AlwaysOnTop = true
-		billboard.Adornee = character.Head
-		billboard.MaxDistance = 150
-		billboard.Parent = character
+local function createESPForCharacter(char, plr)
+    if not char:FindFirstChild("Head") then return end
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ESPTag"
+    billboard.Adornee = char:FindFirstChild("Head")
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.new(0, 100, 0, 40)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.Parent = char
 
-		local nameLabel = Instance.new("TextLabel")
-		nameLabel.Size = UDim2.new(3, 0, 1, 0)
-		nameLabel.BackgroundTransparency = 1
-		nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-		nameLabel.TextStrokeTransparency = 0.5
-		nameLabel.Font = Enum.Font.SourceSansBold
-		nameLabel.TextScaled = true
-		nameLabel.Text = playerObj.Name
-		nameLabel.Parent = billboard
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextStrokeTransparency = 0
+    label.TextScaled = true
+    label.Text = plr.Name .. " | HP: " .. math.floor((char:FindFirstChildOfClass("Humanoid") or {}).Health or 0)
+    label.Parent = billboard
 
-		local healthLabel = Instance.new("TextLabel")
-		healthLabel.Size = UDim2.new(3, 0, 1, 0)
-		healthLabel.Position = UDim2.new(0, 0, 0.5, 0)
-		healthLabel.BackgroundTransparency = 1
-		healthLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-		healthLabel.TextStrokeTransparency = 0.5
-		healthLabel.Font = Enum.Font.SourceSansBold
-		healthLabel.TextScaled = true
-		healthLabel.Name = "HealthLabel"
-		healthLabel.Text = ""
-		healthLabel.Parent = billboard
+    table.insert(espObjects, billboard)
 
-		local humanoid = character:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			coroutine.wrap(function()
-				while billboard and billboard.Parent and espEnabled do
-					healthLabel.Text = "HP: " .. math.floor(humanoid.Health) .. " / " .. math.floor(humanoid.MaxHealth)
-					wait(0.5)
-				end
-			end)()
-		end
-	end
+    local parts = {
+        Head = Color3.fromRGB(255, 0, 0),
+        Torso = Color3.fromRGB(0, 0, 255),
+        ["Left Leg"] = Color3.fromRGB(0, 255, 0),
+        ["Right Leg"] = Color3.fromRGB(0, 255, 0),
+        ["Left Arm"] = Color3.fromRGB(128, 0, 128),
+        ["Right Arm"] = Color3.fromRGB(128, 0, 128)
+    }
+
+    for partName, color in pairs(parts) do
+        local part = char:FindFirstChild(partName)
+        if part and not part:FindFirstChild("Highlight") then
+            local hl = Instance.new("BoxHandleAdornment")
+            hl.Name = "Highlight"
+            hl.Size = part.Size
+            hl.Adornee = part
+            hl.AlwaysOnTop = true
+            hl.ZIndex = 10
+            hl.Color3 = color
+            hl.Transparency = 0.5
+            hl.Parent = part
+            table.insert(espObjects, hl)
+        end
+    end
 end
 
--- Full ESP setup
-local function addESPToCharacter(character, playerObj)
-	for _, part in ipairs(character:GetDescendants()) do
-		if part:IsA("BasePart") and colorMap[part.Name] then
-			addESPPart(part, colorMap[part.Name])
-		end
-	end
-	addNameHealthTag(character, playerObj)
+local function updateESP()
+    clearESP()
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            createESPForCharacter(plr.Character, plr)
+        end
+    end
 end
 
--- Remove ESP
-local function removeESPFromCharacter(character)
-	for _, part in ipairs(character:GetDescendants()) do
-		if part:IsA("BasePart") then
-			local adorn = part:FindFirstChild("ESPAdornment")
-			if adorn then
-				adorn:Destroy()
-			end
-		end
-	end
-	local tag = character:FindFirstChild("ESPBillboard")
-	if tag then
-		tag:Destroy()
-	end
-end
-
--- Toggle ESP
-toggleButton.MouseButton1Click:Connect(function()
-	espEnabled = not espEnabled
-	toggleButton.Text = espEnabled and "ESP ON" or "ESP OFF"
+createButton("Toggle ESP", function()
+    espEnabled = not espEnabled
+    if espEnabled then
+        updateESP()
+    else
+        clearESP()
+    end
 end)
 
--- Auto update ESP
-task.spawn(function()
-	while true do
-		task.wait(1)
-		for _, otherPlayer in ipairs(game.Players:GetPlayers()) do
-			if otherPlayer ~= player and otherPlayer.Character then
-				if espEnabled then
-					addESPToCharacter(otherPlayer.Character, otherPlayer)
-				else
-					removeESPFromCharacter(otherPlayer.Character)
-				end
-			end
-		end
-	end
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function()
+        if espEnabled then
+            wait(1)
+            updateESP()
+        end
+    end)
 end)
 
--- New player joins
-game.Players.PlayerAdded:Connect(function(newPlayer)
-	newPlayer.CharacterAdded:Connect(function(char)
-		repeat task.wait() until char:FindFirstChild("HumanoidRootPart")
-		if espEnabled then
-			addESPToCharacter(char, newPlayer)
-		end
-	end)
+-- 2x Speed
+local speedBoost = false
+createButton("2x Speed", function()
+    speedBoost = not speedBoost
+end)
+
+RunService.Stepped:Connect(function()
+    if speedBoost and LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = 32 end
+    elseif LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = 16 end
+    end
+end)
+
+-- Kill Aura (PvP)
+local killAura = false
+createButton("Kill Aura", function()
+    killAura = not killAura
+end)
+
+RunService.Stepped:Connect(function()
+    if killAura and LocalPlayer.Character then
+        local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if root and tool then
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    if (root.Position - plr.Character.HumanoidRootPart.Position).Magnitude < 10 then
+                        tool:Activate()
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Infinite Jump
+local infJump = false
+createButton("Toggle Infinite Jump", function()
+    infJump = not infJump
+end)
+
+UIS.JumpRequest:Connect(function()
+    if infJump and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+    end
+end)
+
+-- Noclip
+local noclip = false
+createButton("Toggle Noclip", function()
+    noclip = not noclip
+end)
+
+RunService.Stepped:Connect(function()
+    if noclip and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+-- 2x Jump Height
+local jumpBoost = false
+createButton("2x Jump Height", function()
+    jumpBoost = not jumpBoost
+    if LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.JumpPower = jumpBoost and 100 or 50
+        end
+    end
+end)
+
+-- Safe TP (5k studs up)
+createButton("Safe Me (Sky TP)", function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(0, 5000, 0)
+    end
+end)
+
+-- TP to Player
+createButton("TP to Random Player", function()
+    local others = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            table.insert(others, p)
+        end
+    end
+    if #others > 0 then
+        local target = others[math.random(1, #others)]
+        if target and target.Character then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(2, 0, 2)
+        end
+    end
 end)
